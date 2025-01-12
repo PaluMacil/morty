@@ -229,6 +229,8 @@ class AmortizationCalculator(QMainWindow):
             )
 
             month += 1
+        # remove potential additional rows from UI table
+        self.table.setRowCount(len(amortization_table))
 
         return amortization_table, total_interest
 
