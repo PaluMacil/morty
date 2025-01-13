@@ -11,7 +11,7 @@ Morty is a user-friendly amortization calculator built with PySide6, providing a
 
 ## Screenshots
 
-![full window screenshot](full-window-screenshot.png)
+![full window screenshot](docs/full-window-screenshot.png)
 
 ## Usage
 
@@ -20,3 +20,11 @@ Morty is a user-friendly amortization calculator built with PySide6, providing a
 3. **Calculate:** Click the "Calculate" button to generate the amortization table.
 4. **Add Extra Payments (Optional):** Double-click a cell in the "Extra Payment" column to enter an extra payment amount for that month. Change multiple extra payments to see their combined effect. The table updates dynamically to reflect changes. Click the "Extra Payment" header to apply a single extra payment to all rows.
 5. **Reset:** Click "Reset" to clear all inputs and the table, reverting to default values.
+
+## Packaging
+
+To package for Windows, run:
+
+```
+pyinstaller --windowed --onefile --name "Morty" morty/main.py
+```
