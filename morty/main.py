@@ -2,8 +2,9 @@ import calendar
 import sys
 from contextlib import contextmanager
 from os import path
+from typing import Generator
 
-from PySide6.QtCore import Qt, QEvent
+from PySide6.QtCore import Qt, QEvent, QObject, QModelIndex, QAbstractItemModel
 from PySide6.QtGui import QDoubleValidator, QIcon
 from PySide6.QtWidgets import (
     QApplication,
@@ -25,7 +26,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QInputDialog,
     QTabWidget,
-    QTabBar
+    QStyleOptionViewItem
 )
 
 
@@ -120,16 +121,29 @@ class Plan(QWidget):
 
         self.installEventFilter(self)
 
-    def eventFilter(self, obj, event):
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+        """
+        Filters events to handle key presses, particularly the Return key.
+
+        Args:
+            obj (QObject): The object where the event occurred.
+            event (QEvent): The event being filtered.
+
+        Returns:
+            bool: True if the event was handled; otherwise, False.
+        """
         if event.type() == QEvent.KeyPress and event.key() == Qt.Key_Return:
             self.calculate_amortization()
             return True  # Mark event as handled
         return super().eventFilter(obj, event)
 
     @contextmanager
-    def pause_item_changed_signal(self):
+    def pause_item_changed_signal(self) -> Generator:
         """
         Context manager to temporarily disconnect the itemChanged signal.
+
+        Yields:
+            None: Allows the encapsulated block of code to execute without the signal.
         """
         self.table.itemChanged.disconnect(self.handle_extra_payment_change)
         try:
@@ -137,7 +151,7 @@ class Plan(QWidget):
         finally:
             self.table.itemChanged.connect(self.handle_extra_payment_change)
 
-    def reset_calculator(self):
+    def reset_calculator(self) -> None:
         """Resets the calculator to initial state."""
         self.principal_input.setText(self.DEFAULT_PRINCIPAL)
         self.annual_rate_input.setText(self.DEFAULT_ANNUAL_RATE)
@@ -146,8 +160,10 @@ class Plan(QWidget):
         self.start_month_dropdown.setCurrentText("1 (numbered)")
         self.calculate_amortization()
 
-    def update_year_start_visibility(self):
-        """Shows/hides year start group based on start month selection and recalculates."""
+    def update_year_start_visibility(self) -> None:
+        """
+        Shows or hides the 'year start' group based on the start month selection and recalculates the amortization.
+        """
         start_month_text = self.start_month_dropdown.currentText()
         if start_month_text == "1 (numbered)":
             self.year_start_group.setVisible(False)
@@ -156,7 +172,7 @@ class Plan(QWidget):
         self.update_row_number_visibility()
         self.calculate_amortization()
 
-    def update_row_number_visibility(self):
+    def update_row_number_visibility(self) -> None:
         """Update the visibility of row numbers based on the Start Month setting."""
         start_month_text = self.start_month_dropdown.currentText()
         if start_month_text == "1 (numbered)":
@@ -164,8 +180,13 @@ class Plan(QWidget):
         else:
             self.table.verticalHeader().setVisible(True)
 
-    def calculate_amortization(self):
-        """Calculates and displays the amortization table, handling extra payments."""
+    def calculate_amortization(self) -> None:
+        """
+        Calculates and displays the amortization table, accounting for extra payments.
+
+        Raises:
+            ValueError: If input values cannot be converted into the appropriate data types for calculation.
+        """
         try:
             principal = float(self.principal_input.text())
             annual_rate = float(self.annual_rate_input.text())
@@ -187,12 +208,12 @@ class Plan(QWidget):
         self, principal: float, annual_rate: float, years: int, extra_payments: list[float] = None
     ) -> tuple[list[dict[str, float]], float]:
         """
-        Calculate the amortization table.
+        Calculate the amortization table, which determines monthly payments, interest, and the remaining balance.
 
         Args:
             principal (float): The loan amount.
-            annual_rate (float): The annual interest rate in percent.
-            years (int): The loan term in years.
+            annual_rate (float): The annual interest rate, expressed as a percentage.
+            years (int): The loan term, in years.
             extra_payments (List[float]): A list of extra payments for each month.
 
         Returns:
@@ -243,7 +264,7 @@ class Plan(QWidget):
 
         return amortization_table, total_interest
 
-    def handle_header_click(self, logical_index: int):
+    def handle_header_click(self, logical_index: int) -> None:
         """
         Handle clicks on the table header.
         If the "Extra Payment" column is clicked, prompt the user for a value and apply it to the entire column.
@@ -262,7 +283,7 @@ class Plan(QWidget):
                         new_item.setData(Qt.EditRole, value)
                         self.table.setItem(row, 3, new_item)
 
-    def update_sum_of_selected(self):
+    def update_sum_of_selected(self) -> None:
         selected_items = self.table.selectedItems()
         total_sum = 0.0
 
@@ -291,7 +312,7 @@ class Plan(QWidget):
                     pass
         return extra_payments
 
-    def _display_amortization_table(self, amortization: list[dict[str, float]]):
+    def _display_amortization_table(self, amortization: list[dict[str, float]]) -> None:
         """
         Display the amortization table in the UI.
 
@@ -343,7 +364,7 @@ class Plan(QWidget):
                         item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                         self.table.setItem(row_num, col_num, item)
 
-    def handle_extra_payment_change(self, cell: QTableWidgetItem):
+    def handle_extra_payment_change(self, cell: QTableWidgetItem) -> None:
         """Handles changes to the 'Extra Payment' column."""
         if cell.column() != 3:  # Early return if not the "Extra Payment" column
             return
@@ -377,7 +398,14 @@ class Plan(QWidget):
         except ValueError:
             pass
 
-    def update_totals_display(self, amortization, total_interest, principal, annual_rate, years):
+    def update_totals_display(
+            self,
+            amortization: list[dict[str, float]],
+            total_interest: float,
+            principal: float,
+            annual_rate: float,
+            years: int
+    ) -> None:
         total_paid = sum(entry['Total Payment'] for entry in amortization)
         self.interest_paid_label.setText(f"Interest Paid: ${total_interest:,.2f}")
         self.total_paid_label.setText(f"Total Paid: ${total_paid:,.2f}")
@@ -392,21 +420,21 @@ class Plan(QWidget):
 
 
 class CurrencyDelegate(QStyledItemDelegate):
-    def __init__(self, parent=None):
+    def __init__(self, parent: QWidget | None=None):
         super().__init__(parent)
 
-    def createEditor(self, parent, option, index):
+    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
         editor = QLineEdit(parent)
         validator = QDoubleValidator(0.0, float('inf'), 2, editor)
         validator.setNotation(QDoubleValidator.StandardNotation)
         editor.setValidator(validator)
         return editor
 
-    def setEditorData(self, editor, index):
+    def setEditorData(self, editor: QLineEdit, index: QModelIndex) -> None:
         value = index.model().data(index, Qt.DisplayRole)
         editor.setText(str(value))
 
-    def setModelData(self, editor, model, index):
+    def setModelData(self, editor: QLineEdit, model: QAbstractItemModel, index: QModelIndex) -> None:
         value = editor.text()
         model.setData(index, value, Qt.EditRole)
 
@@ -444,13 +472,13 @@ class AmortizationCalculator(QMainWindow):
         # Add the first tab
         self.add_tab()
 
-    def add_tab(self):
+    def add_tab(self) -> None:
         """Adds a new tab with a Plan widget."""
         new_plan = Plan()
         tab_index = self.tab_widget.addTab(new_plan, f"Plan {self.tab_widget.count() + 1}")
         self.tab_widget.setCurrentIndex(tab_index)
 
-    def close_tab(self, index):
+    def close_tab(self, index: int) -> None:
         """Closes the tab at the specified index."""
         self.tab_widget.removeTab(index)
         # Rename remaining tabs
