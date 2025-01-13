@@ -21,14 +21,16 @@ from PySide6.QtWidgets import (
     QComboBox,
     QRadioButton,
     QStyledItemDelegate,
-    QLineEdit, QInputDialog,
+    QLineEdit,
+    QInputDialog,
+    QTabWidget,
+    QTabBar
 )
 
 
-class AmortizationCalculator(QMainWindow):
+class Plan(QWidget):
     """
-    A PySide6-based amortization calculator with a UI for flexible calculations.
-    Users can input loan details, edit extra payments, and view the amortization table.
+    A single amortization plan, encapsulated in a QWidget.
     """
 
     DEFAULT_PRINCIPAL = "348300"
@@ -37,13 +39,7 @@ class AmortizationCalculator(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Morty (your friendly amortization calculator)")
-        self.setGeometry(100, 100, 800, 1100)
-
-        # Main widget and layout
-        self.main_widget = QWidget()
-        self.setCentralWidget(self.main_widget)
-        self.layout = QVBoxLayout(self.main_widget)
+        self.layout = QVBoxLayout(self)
 
         # Input fields
         self.input_form = QFormLayout()
@@ -383,6 +379,50 @@ class CurrencyDelegate(QStyledItemDelegate):
     def setModelData(self, editor, model, index):
         value = editor.text()
         model.setData(index, value, Qt.EditRole)
+
+
+class AmortizationCalculator(QMainWindow):
+    """
+    A PySide6-based amortization calculator with a UI for flexible calculations.
+    Users can input loan details, edit extra payments, and view the amortization table.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Morty (your friendly amortization calculator)")
+        self.setGeometry(100, 100, 800, 1100)
+
+        # Main widget and layout
+        self.main_widget = QWidget()
+        self.setCentralWidget(self.main_widget)
+        self.layout = QVBoxLayout(self.main_widget)
+
+        # Tab widget
+        self.tab_widget = QTabWidget()
+        self.tab_widget.setTabsClosable(True)
+        self.tab_widget.tabCloseRequested.connect(self.close_tab)
+        self.layout.addWidget(self.tab_widget)
+
+        # Add a button to create new tabs
+        self.add_tab_button = QPushButton("Add Plan")
+        self.add_tab_button.clicked.connect(self.add_tab)
+        self.layout.addWidget(self.add_tab_button)
+
+        # Add the first tab
+        self.add_tab()
+
+    def add_tab(self):
+        """Adds a new tab with a Plan widget."""
+        new_plan = Plan()
+        tab_index = self.tab_widget.addTab(new_plan, f"Plan {self.tab_widget.count() + 1}")
+        self.tab_widget.setCurrentIndex(tab_index)
+
+    def close_tab(self, index):
+        """Closes the tab at the specified index."""
+        self.tab_widget.removeTab(index)
+        # Rename remaining tabs
+        for i in range(self.tab_widget.count()):
+            self.tab_widget.setTabText(i, f"Plan {i + 1}")
 
 
 if __name__ == "__main__":
