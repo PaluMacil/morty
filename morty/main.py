@@ -87,11 +87,14 @@ class Plan(QWidget):
         self.interest_no_extra_label = QLabel("")
         self.total_paid_label = QLabel("")
         self.total_no_extra_label = QLabel("")
+        self.sum_of_selected_label = QLabel("Sum of Selected: $0.00")
+        self.sum_of_selected_label.setVisible(False)
 
         self.totals_layout.addWidget(self.interest_paid_label, 0, 0, alignment=Qt.AlignLeft)  # row 0, column 0
         self.totals_layout.addWidget(self.total_paid_label, 0, 1, alignment=Qt.AlignRight)  # row 0, column 1
         self.totals_layout.addWidget(self.interest_no_extra_label, 1, 0, alignment=Qt.AlignLeft)  # row 1, column 0
         self.totals_layout.addWidget(self.total_no_extra_label, 1, 1, alignment=Qt.AlignRight)  # row 1, column 1
+        self.totals_layout.addWidget(self.sum_of_selected_label, 2, 0, 1, 2, alignment=Qt.AlignLeft)
 
         self.layout.addWidget(self.totals_group_box)
         self.total_interest_no_extra_label = QLabel("")
@@ -109,6 +112,7 @@ class Plan(QWidget):
         currency_delegate = CurrencyDelegate(self.table)
         self.table.setItemDelegateForColumn(3, currency_delegate)
         self.table.itemChanged.connect(self.handle_extra_payment_change)
+        self.table.itemSelectionChanged.connect(self.update_sum_of_selected)
         self.table.horizontalHeader().sectionClicked.connect(self.handle_header_click)
         self.update_row_number_visibility()
         self.layout.addWidget(self.table)
@@ -196,7 +200,7 @@ class Plan(QWidget):
         # Initialize variables
         balance = principal
         amortization_table = []
-        total_interest = 0
+        total_interest = 0.0
         month = 1
 
         while balance > 0:
@@ -248,6 +252,23 @@ class Plan(QWidget):
                         new_item = QTableWidgetItem()
                         new_item.setData(Qt.EditRole, value)
                         self.table.setItem(row, 3, new_item)
+
+    def update_sum_of_selected(self):
+        selected_items = self.table.selectedItems()
+        total_sum = 0.0
+
+        for item in selected_items:
+            try:
+                value = float(item.text().replace(",", ""))
+                total_sum += value
+            except ValueError:
+                pass
+
+        if total_sum > 0:
+            self.sum_of_selected_label.setText(f"Sum of Selected: ${total_sum:,.2f}")
+            self.sum_of_selected_label.setVisible(True)
+        else:
+            self.sum_of_selected_label.setVisible(False)
 
     def _get_extra_payments(self, num_rows: int) -> list[float]:
         """Retrieves extra payments from the table's model data."""
