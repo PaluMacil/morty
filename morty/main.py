@@ -2,7 +2,7 @@ import calendar
 import sys
 from contextlib import contextmanager
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QEvent
 from PySide6.QtGui import QDoubleValidator
 from PySide6.QtWidgets import (
     QApplication,
@@ -116,6 +116,14 @@ class Plan(QWidget):
         self.table.horizontalHeader().sectionClicked.connect(self.handle_header_click)
         self.update_row_number_visibility()
         self.layout.addWidget(self.table)
+
+        self.installEventFilter(self)
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.KeyPress and event.key() == Qt.Key_Return:
+            self.calculate_amortization()
+            return True  # Mark event as handled
+        return super().eventFilter(obj, event)
 
     @contextmanager
     def pause_item_changed_signal(self):
