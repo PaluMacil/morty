@@ -1,9 +1,10 @@
 import calendar
 import sys
 from contextlib import contextmanager
+from os import path
 
 from PySide6.QtCore import Qt, QEvent
-from PySide6.QtGui import QDoubleValidator
+from PySide6.QtGui import QDoubleValidator, QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -214,7 +215,7 @@ class Plan(QWidget):
         while balance > 0:
             interest = balance * monthly_rate
             principal_payment = monthly_payment - interest
-            extra_payment = extra_payments[month - 1] if extra_payments else 0
+            extra_payment = extra_payments[month - 1] if extra_payments and month <= len(extra_payments) else 0
             total_payment = monthly_payment + extra_payment
 
             # Check if the total payment exceeds the remaining balance
@@ -420,6 +421,9 @@ class AmortizationCalculator(QMainWindow):
         super().__init__()
         self.setWindowTitle("Morty (your friendly amortization calculator)")
         self.setGeometry(100, 100, 800, 1100)
+        bundle_dir = path.abspath(path.dirname(__file__))
+        icon_path = path.join(bundle_dir, "friendly.ico")  # path when bundled by PyInstaller
+        self.setWindowIcon(QIcon(icon_path))
 
         # Main widget and layout
         self.main_widget = QWidget()

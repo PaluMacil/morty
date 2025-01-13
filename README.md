@@ -26,5 +26,5 @@ Morty is a user-friendly amortization calculator built with PySide6, providing a
 To package for Windows, run:
 
 ```
-pyinstaller --windowed --onefile --name "Morty" morty/main.py
+pyinstaller --windowed --onefile --name "Morty" --icon=morty/friendly.ico --add-data "morty/friendly.ico;." morty/main.py
 ```
