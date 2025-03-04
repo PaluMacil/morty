@@ -165,7 +165,7 @@ class Plan(QWidget):
         Shows or hides the 'year start' group based on the start month selection and recalculates the amortization.
         """
         start_month_text = self.start_month_dropdown.currentText()
-        if start_month_text == "1 (numbered)":
+        if start_month_text in ["1 (numbered)", "Jan"]:
             self.year_start_group.setVisible(False)
         else:
             self.year_start_group.setVisible(True)
@@ -199,7 +199,23 @@ class Plan(QWidget):
             )
             self._display_amortization_table(amortization)
 
-            self.update_totals_display(amortization, total_interest, principal, annual_rate, years)
+            # Calculate and display "no extra payment" values for comparison.
+            # The following lines are redundant and should be removed
+            # amortization_no_extra, total_interest_no_extra = self._calculate_amortization_table(principal, annual_rate, years)
+            # total_paid_no_extra = sum(entry['Total Payment'] for entry in amortization_no_extra)
+            # self.interest_no_extra_label.setText(f"Interest Paid (No Extra): ${total_interest_no_extra:,.2f}")
+            # self.total_no_extra_label.setText(f"Total Paid (No Extra): ${total_paid_no_extra:,.2f}")
+
+            self.totals_group_box.setVisible(True)
+            self.totals_group_box.setVisible(True)
+            # The following lines are redundant and should be removed
+            # amortization_no_extra, total_interest_no_extra = self._calculate_amortization_table(principal, annual_rate, years)
+            # total_paid_no_extra = sum(entry['Total Payment'] for entry in amortization_no_extra)
+            # self.interest_no_extra_label.setText(f"Interest Paid (No Extra): ${total_interest_no_extra:,.2f}")
+            # self.total_no_extra_label.setText(f"Total Paid (No Extra): ${total_paid_no_extra:,.2f}")
+
+            self.totals_group_box.setVisible(True)
+            self.totals_group_box.setVisible(True)
 
         except ValueError as e:
             print(f"Invalid input: {e}")
