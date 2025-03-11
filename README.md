@@ -23,8 +23,39 @@ Morty is a user-friendly amortization calculator built with PySide6, providing a
 
 ## Packaging
 
+### For Windows
+
 To package for Windows, run:
 
 ```
 pyinstaller --windowed --onefile --name "Morty" --icon=morty/friendly.ico --add-data "morty/friendly.ico;." morty/main.py
+```
+
+### For macOS
+
+To package for macOS, run:
+
+```
+pyinstaller --windowed --onefile --name "Morty" --icon=morty/friendly.ico --add-data "morty/friendly.ico:." morty/main.py
+```
+
+Note the colon (:) instead of semicolon (;) in the --add-data parameter for macOS.
+
+## Development
+
+### Prerequisites
+
+- Python 3.12 or newer
+- Poetry for dependency management
+
+### Setup
+
+1. Clone the repository
+2. Run `poetry install` to set up the development environment
+3. Run `poetry run python -m morty.main` to start the application
+
+### Running Tests
+
+```
+poetry run pytest
 ```

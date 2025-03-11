@@ -1,4 +1,5 @@
 import calendar
+import csv
 import sys
 from contextlib import contextmanager
 from os import path
@@ -26,7 +27,9 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QInputDialog,
     QTabWidget,
-    QStyleOptionViewItem
+    QStyleOptionViewItem,
+    QMessageBox,
+    QFileDialog
 )
 
 
@@ -46,8 +49,16 @@ class Plan(QWidget):
         # Input fields
         self.input_form = QFormLayout()
         self.principal_input = QLineEdit(self.DEFAULT_PRINCIPAL)
+        self.principal_input.setValidator(QDoubleValidator(0.01, 999999999.99, 2))
+        
         self.annual_rate_input = QLineEdit(self.DEFAULT_ANNUAL_RATE)
+        annual_rate_validator = QDoubleValidator(0.01, 99.99, 2)
+        annual_rate_validator.setNotation(QDoubleValidator.StandardNotation)
+        self.annual_rate_input.setValidator(annual_rate_validator)
+        
         self.years_input = QLineEdit(self.DEFAULT_YEARS)
+        self.years_input.setValidator(QDoubleValidator(1, 100, 0)) 
+
         self.input_form.addRow("Principal ($):", self.principal_input)
         self.input_form.addRow("Annual Interest Rate (%):", self.annual_rate_input)
         self.input_form.addRow("Loan Term (Years):", self.years_input)
@@ -74,9 +85,14 @@ class Plan(QWidget):
         self.calculate_button = QPushButton("Calculate")
         self.calculate_button.clicked.connect(self.calculate_amortization)
         self.reset_button = QPushButton("Reset")
-        self.reset_button.clicked.connect(self.reset_calculator)  # Connect to reset function
+        self.reset_button.clicked.connect(self.reset_calculator)
+        self.export_button = QPushButton("Export to CSV")
+        self.export_button.clicked.connect(self.export_to_csv)
+        self.export_button.setEnabled(False)  # Initially disabled until there's data to export
+        
         self.button_layout.addWidget(self.calculate_button)
         self.button_layout.addWidget(self.reset_button)
+        self.button_layout.addWidget(self.export_button)
         self.layout.addLayout(self.button_layout)
 
         # Totals Group Box
@@ -105,14 +121,14 @@ class Plan(QWidget):
 
         # Table for amortization schedule
         self.table = QTableWidget()
-        self.table.setColumnCount(5)
+        self.table.setColumnCount(6)  # Setting to 6 columns to match the headers in _display_amortization_table
         self.table.setHorizontalHeaderLabels(
-            ["Month", "Total Payment", "Principal Payment", "Interest Payment", "Remaining Balance"]
+            ["Month", "Total Payment", "Principal Payment", "Extra Payment", "Interest Payment", "Remaining Balance"]
         )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         # Set the delegate for the "Extra Payment" column
         currency_delegate = CurrencyDelegate(self.table)
-        self.table.setItemDelegateForColumn(3, currency_delegate)
+        self.table.setItemDelegateForColumn(3, currency_delegate)  # Extra Payment column
         self.table.itemChanged.connect(self.handle_extra_payment_change)
         self.table.itemSelectionChanged.connect(self.update_sum_of_selected)
         self.table.horizontalHeader().sectionClicked.connect(self.handle_header_click)
@@ -188,9 +204,27 @@ class Plan(QWidget):
             ValueError: If input values cannot be converted into the appropriate data types for calculation.
         """
         try:
-            principal = float(self.principal_input.text())
-            annual_rate = float(self.annual_rate_input.text())
-            years = int(self.years_input.text())
+            # Validate inputs
+            try:
+                principal = float(self.principal_input.text().replace(',', ''))
+                if principal <= 0:
+                    raise ValueError("Principal must be a positive number")
+            except ValueError:
+                raise ValueError("Principal must be a valid number")
+                
+            try:
+                annual_rate = float(self.annual_rate_input.text())
+                if annual_rate <= 0:
+                    raise ValueError("Interest rate must be a positive number")
+            except ValueError:
+                raise ValueError("Interest rate must be a valid number")
+                
+            try:
+                years = int(self.years_input.text())
+                if years <= 0:
+                    raise ValueError("Loan term must be a positive integer")
+            except ValueError:
+                raise ValueError("Loan term must be a valid integer")
 
             extra_payments = self._get_extra_payments(self.table.rowCount())
 
@@ -199,25 +233,33 @@ class Plan(QWidget):
             )
             self._display_amortization_table(amortization)
 
-            # Calculate and display "no extra payment" values for comparison.
-            # The following lines are redundant and should be removed
-            # amortization_no_extra, total_interest_no_extra = self._calculate_amortization_table(principal, annual_rate, years)
-            # total_paid_no_extra = sum(entry['Total Payment'] for entry in amortization_no_extra)
-            # self.interest_no_extra_label.setText(f"Interest Paid (No Extra): ${total_interest_no_extra:,.2f}")
-            # self.total_no_extra_label.setText(f"Total Paid (No Extra): ${total_paid_no_extra:,.2f}")
+            # Calculate and display "no extra payment" values for comparison
+            amortization_no_extra, total_interest_no_extra = self._calculate_amortization_table(
+                principal, annual_rate, years
+            )
+            total_paid_no_extra = sum(entry['Total Payment'] for entry in amortization_no_extra)
+            
+            # Update totals display
+            total_paid = sum(entry['Total Payment'] for entry in amortization)
+            self.interest_paid_label.setText(f"Interest Paid: ${total_interest:,.2f}")
+            self.total_paid_label.setText(f"Total Paid: ${total_paid:,.2f}")
+            self.interest_no_extra_label.setText(f"Interest Paid (No Extra): ${total_interest_no_extra:,.2f}")
+            self.total_no_extra_label.setText(f"Total Paid (No Extra): ${total_paid_no_extra:,.2f}")
 
             self.totals_group_box.setVisible(True)
-            self.totals_group_box.setVisible(True)
-            # The following lines are redundant and should be removed
-            # amortization_no_extra, total_interest_no_extra = self._calculate_amortization_table(principal, annual_rate, years)
-            # total_paid_no_extra = sum(entry['Total Payment'] for entry in amortization_no_extra)
-            # self.interest_no_extra_label.setText(f"Interest Paid (No Extra): ${total_interest_no_extra:,.2f}")
-            # self.total_no_extra_label.setText(f"Total Paid (No Extra): ${total_paid_no_extra:,.2f}")
 
-            self.totals_group_box.setVisible(True)
-            self.totals_group_box.setVisible(True)
+            if total_paid_no_extra > 0:
+                self.export_button.setEnabled(True)  # Enable the export button if there are results
+            else:
+                self.export_button.setDisabled(True)
 
         except ValueError as e:
+            error_box = QMessageBox()
+            error_box.setIcon(QMessageBox.Critical)
+            error_box.setWindowTitle("Input Error")
+            error_box.setText(str(e))
+            error_box.setStandardButtons(QMessageBox.Ok)
+            error_box.exec()
             print(f"Invalid input: {e}")
 
     def _calculate_amortization_table(
@@ -285,6 +327,7 @@ class Plan(QWidget):
         Handle clicks on the table header.
         If the "Extra Payment" column is clicked, prompt the user for a value and apply it to the entire column.
         """
+        # Column 3 should be "Extra Payment" - matching our header labels
         if logical_index == 3:  # "Extra Payment" column
             value, ok = QInputDialog.getDouble(
                 self, "Extra Payment", "Enter extra payment to apply to all rows:", decimals=2
@@ -320,7 +363,7 @@ class Plan(QWidget):
         """Retrieves extra payments from the table's model data."""
         extra_payments = [0.0] * num_rows
         for row in range(num_rows):
-            item = self.table.item(row, 3)  # Index of Extra Payment column
+            item = self.table.item(row, 3)  # Index 3 for the "Extra Payment" column
             if item:
                 try:
                     extra_payments[row] = float(item.text().replace(",", ""))
@@ -357,7 +400,7 @@ class Plan(QWidget):
                     elif self.calendar_year_button.isChecked():
                         year_offset = (month_num + start_month_num - 2) // 12
                     else:
-                        raise NotImplemented("newly added radio button not configured")
+                        raise NotImplementedError("Newly added radio button not configured")
                     month_str = f"{month_name} Y{year_offset + 1}"
                 else:
                     month_str = str(month_num)
@@ -434,6 +477,60 @@ class Plan(QWidget):
 
         self.totals_group_box.setVisible(True)
 
+    def export_to_csv(self) -> None:
+        """Export the amortization schedule to a CSV file."""
+        if self.table.rowCount() == 0:
+            QMessageBox.warning(self, "No Data", "There is no data to export. Please calculate an amortization schedule first.")
+            return
+            
+        options = QFileDialog.Options()
+        file_name, _ = QFileDialog.getSaveFileName(self, "Save Amortization Schedule", "",
+                                                  "CSV Files (*.csv);;All Files (*)", options=options)
+        if not file_name:
+            return  # User canceled the dialog
+            
+        # Add .csv extension if not present
+        if not file_name.lower().endswith('.csv'):
+            file_name += '.csv'
+
+        try:
+            with open(file_name, mode='w', newline='') as csv_file:
+                writer = csv.writer(csv_file)
+
+                # Write loan details as header information
+                writer.writerow(["Loan Details"])
+                writer.writerow(["Principal", f"${self.principal_input.text()}"])
+                writer.writerow(["Annual Interest Rate", f"{self.annual_rate_input.text()}%"])
+                writer.writerow(["Loan Term", f"{self.years_input.text()} years"])
+                writer.writerow([])  # Empty row for separation
+
+                # Write summary information
+                if self.totals_group_box.isVisible():
+                    writer.writerow(["Summary"])
+                    writer.writerow(["Interest Paid", self.interest_paid_label.text().split(": ")[1]])
+                    writer.writerow(["Total Paid", self.total_paid_label.text().split(": ")[1]])
+                    writer.writerow(["Interest Paid (No Extra)", self.interest_no_extra_label.text().split(": ")[1]])
+                    writer.writerow(["Total Paid (No Extra)", self.total_no_extra_label.text().split(": ")[1]])
+                    writer.writerow([])  # Empty row for separation
+
+                # Write headers
+                headers = []
+                for col in range(self.table.columnCount()):
+                    headers.append(self.table.horizontalHeaderItem(col).text())
+                writer.writerow(headers)
+
+                # Write amortization rows
+                for row_index in range(self.table.rowCount()):
+                    row_data = []
+                    for col in range(self.table.columnCount()):
+                        cell = self.table.item(row_index, col)
+                        row_data.append(cell.text() if cell else "")
+                    writer.writerow(row_data)
+
+            QMessageBox.information(self, "Export Successful", f"Amortization schedule exported successfully to {file_name}")
+        except Exception as e:
+            QMessageBox.critical(self, "Export Error", f"Failed to export data: {str(e)}")
+
 
 class CurrencyDelegate(QStyledItemDelegate):
     def __init__(self, parent: QWidget | None=None):
@@ -460,10 +557,11 @@ class AmortizationCalculator(QMainWindow):
     A PySide6-based amortization calculator with a UI for flexible calculations.
     Users can input loan details, edit extra payments, and view the amortization table.
     """
+    VERSION = "0.2.0"
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Morty (your friendly amortization calculator)")
+        self.setWindowTitle(f"Morty v{self.VERSION} (your friendly amortization calculator)")
         self.setGeometry(100, 100, 800, 1100)
         bundle_dir = path.abspath(path.dirname(__file__))
         icon_path = path.join(bundle_dir, "friendly.ico")  # path when bundled by PyInstaller
@@ -480,10 +578,20 @@ class AmortizationCalculator(QMainWindow):
         self.tab_widget.tabCloseRequested.connect(self.close_tab)
         self.layout.addWidget(self.tab_widget)
 
+        # Add buttons horizontally
+        self.buttons_layout = QHBoxLayout()
+        
         # Add a button to create new tabs
         self.add_tab_button = QPushButton("Add Plan")
         self.add_tab_button.clicked.connect(self.add_tab)
-        self.layout.addWidget(self.add_tab_button)
+        self.buttons_layout.addWidget(self.add_tab_button)
+        
+        # Add an About button
+        self.about_button = QPushButton("About")
+        self.about_button.clicked.connect(self.show_about_dialog)
+        self.buttons_layout.addWidget(self.about_button)
+        
+        self.layout.addLayout(self.buttons_layout)
 
         # Add the first tab
         self.add_tab()
@@ -500,6 +608,21 @@ class AmortizationCalculator(QMainWindow):
         # Rename remaining tabs
         for i in range(self.tab_widget.count()):
             self.tab_widget.setTabText(i, f"Plan {i + 1}")
+            
+    def show_about_dialog(self) -> None:
+        """Shows the about dialog with version and copyright information."""
+        msg_box = QMessageBox()
+        msg_box.setWindowTitle("About Morty")
+        msg_box.setTextFormat(Qt.RichText)
+        msg_box.setText(f"""
+        <h3>Morty v{self.VERSION}</h3>
+        <p>Your friendly amortization calculator</p>
+        <p>Copyright © 2025 Dan Wolf</p>
+        <p>Licensed under the MIT License</p>
+        <p>Built with PySide6</p>
+        """)
+        msg_box.setStandardButtons(QMessageBox.Ok)
+        msg_box.exec()
 
 
 if __name__ == "__main__":
